@@ -14,4 +14,13 @@
 
 #define MAX_BUF 256
 
+static const char * error_msg[] =
+{
+	"ERROR: Invalid error called\n",
+	"ERROR: Bad Arguments!\nUsage: download <url>\n"	
+};
+
+int parseURLelems(char * argument, char * host, char * path, char * user, char * password);
+int printerror(int num);
+
 #endif
