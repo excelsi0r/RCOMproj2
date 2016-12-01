@@ -20,7 +20,7 @@ static const char * error_msg[] =
 	"ERROR: Bad Arguments!\nUsage: download <url>\n"	
 };
 
-int parseURLelems(char * argument, char * host, char * path, char * user, char * password);
+int parseURLelems(const char * argument, char * host, char * path, char * user, char * password);
 int printerror(int num);
 
 #endif

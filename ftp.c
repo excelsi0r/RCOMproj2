@@ -1,6 +1,6 @@
 #include "ftp.h"
 
-int main(int argc, char * argv[])
+int main(int argc, const char * argv[])
 {
 
 	//Checking if correct arguments
@@ -27,7 +27,7 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-int parseURLelems(char * argument, char * host, char * path, char * user, char * password)
+int parseURLelems(const char * argument, char * host, char * path, char * user, char * password)
 {
 	return 0;
 }
