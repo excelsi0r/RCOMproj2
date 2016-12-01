@@ -4,7 +4,7 @@ int main(int argc, const char * argv[])
 {
 
 	//Checking if correct arguments
-	if(argc != 3 || strcmp("download", argv[1]) != 0)
+	if(argc != 2)
 	{
 		printerror(1);
 		return 1;
@@ -17,13 +17,168 @@ int main(int argc, const char * argv[])
 	char user[MAX_BUF];
 	char pass[MAX_BUF];
 	
-	int error = parseURLelems(argv[2], host, path, user, pass);
+	int error = parseURLelems(argv[1], host, path, user, pass);
 	if(error != 0)
 	{
 		printerror(error);
 		return error;
 	}
 	
+	//Now with proper elements time to retrieve info prome server
+	struct addrinfo *host_info, *host_info2;
+	struct sockaddr_in * server_addr = NULL;
+	
+	//Getting information about the host provided
+	if((error = getaddrinfo(host, "ftp", NULL, &host_info)) != 0)
+	{
+		printerror(3);
+		return 3;
+	}
+	
+	host_info2 = host_info;
+	
+	//Trying to get the proper IP address from the server
+	//to connect to the socket in order to get the file
+	//Server must be of type AF_INET (IPV4 type)
+	//Searches for the first Server of type AF_INET
+	//in the linked list of the same host
+	while(host_info2 != NULL)
+	{
+		if(host_info2->ai_family == AF_INET)
+		{
+			server_addr = (struct sockaddr_in *)host_info2->ai_addr;
+			break;	
+		}
+		
+		host_info2 = host_info2->ai_next;
+	}
+	
+	//In case the Server has no IPV4 (AF_INET) server type
+	if(server_addr == NULL)
+	{
+		printerror(4);
+		return 4;
+	}
+	
+	//Creating sockets
+	int socket1, socket2;
+	
+	//IPV4 and two-way connection-based byte stream
+	if((socket1 = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		printerror(5);
+		return 5;
+	}
+	
+	if((socket2 = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		printerror(5);
+		return 5;
+	}
+	
+	//Establishing connection to the server on the first socket
+	if(connect(socket1, (const struct sockaddr *)server_addr, sizeof(*server_addr)) != 0)
+	{
+		printerror(6);
+		return 6;
+	}
+	
+	//Upon connection it is time check if the server is ready
+	char res[MAX_BUF];
+	error = getResponseFromServer(socket1, SERVER_READY, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Server Was not Ready, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printf("Server Ready \n");
+	printmsg(res);	
+	
+	//Send user command
+	char cmd[MAX_BUF];
+	if(snprintf(cmd, MAX_BUF, "user %s\n", user) < 0)
+	{
+		printerror(11);
+		return 11;
+	}
+	
+	if((error = sendCommand(socket1, cmd)) != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	
+	//Read user command response
+	error = getResponseFromServer(socket1, USERNAME_OK, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Failed to Enter Username, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);
+	
+	//Send password command
+	if(snprintf(cmd, MAX_BUF, "pass %s\n", pass) < 0)
+	{
+		printerror(11);
+		return 11;
+	}
+	
+	if((error = sendCommand(socket1, cmd)) != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	
+	//Read passsword command response
+	error = getResponseFromServer(socket1, LOGIN_OK, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Failed to Enter Password, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);
+	
+	//Send Passive mode Command
+	if((error = sendCommand(socket1, "pasv\n")) != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	
+	//Read the Passive Mode command response
+	error = getResponseFromServer(socket1, PASS_MODE, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Failed to Enter Passive Mode, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);
+	
+	
+	
+	
+
 	return 0;
 }
 
@@ -101,17 +256,71 @@ int replacewithspaces(const char * resturl, char * spliturl)
 	return -1;
 }
 
+int getResponseFromServer(int socket, int expected, char * res)
+{
+	int code;
+	ssize_t resSize;
+	
+	if((resSize = read(socket, res, MAX_BUF - 1)) < 0)
+	{
+		return 7;
+	}
+	
+	res[resSize] = 0;
+	
+	if(sscanf(res, "%d", &code) < 1)
+	{
+		return 8;
+	}
+	
+	if(code != expected)
+	{
+		return 9;
+	}
+	
+	return 0;	
+}
+
+int sendCommand(int socket, char * cmd)
+{
+	ssize_t bytesWritten;
+	int bytesToWrite = strlen(cmd);
+	
+	if((bytesWritten = write(socket, cmd, bytesToWrite)) < 0)
+	{
+		return 10;
+	}
+	
+	if(bytesWritten != bytesToWrite)
+	{
+		return 10;
+	}
+	
+	return 0;
+}
+
 int printerror(int errorno)
 {
 	int len = sizeof(error_msg)/sizeof(char *);
 	
 	if(errorno > len)
 	{
-		printf("%s", error_msg[0]);
+		printf("%s\n", error_msg[0]);
 		return 0;
 	}
 
-	printf("%s", error_msg[errorno]);
+	printf("%s\n", error_msg[errorno]);
+	return 0;
+}
+
+int printmsg(char * msg)
+{
+	char greet[MAX_BUF];
+	int n;
+	
+	sscanf(msg, "%d %[^\n]s", &n, greet);
+	
+	printf("Code: %d | %s\n",n, greet);
 	return 0;
 }
 
