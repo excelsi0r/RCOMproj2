@@ -175,9 +175,133 @@ int main(int argc, const char * argv[])
 	
 	printmsg(res);
 	
+	//Given the new Secure connection it is time to parse it
+	int newConnection[6];
+	if((error = parsePassiveModeParams(res, newConnection)) != 0)
+	{
+		printerror(error);
+		return error;
+	}
 	
 	
+	//Start connection on the second socket.
+	int port = newConnection[4] * 256 + newConnection[5]; //calculate new port
 	
+	struct sockaddr_in newSocketAddress;
+	
+	//setting the new port for passive with the same ip
+	memcpy(&newSocketAddress, server_addr, sizeof(struct sockaddr_in));
+	newSocketAddress.sin_port = htons(port);
+	
+	//Connecting the Second socket with the new information
+	if(connect(socket2, (const struct sockaddr *)&newSocketAddress, sizeof(newSocketAddress)) != 0)
+	{
+		printerror(6);
+		return 6;
+	}
+	
+	//Send command to retrieve file
+	if(snprintf(cmd, MAX_BUF, "retr %s\n", path) < 0)
+	{
+		printerror(11);
+		return 11;
+	}
+	
+	if((error = sendCommand(socket1, cmd)) != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	
+	//Read command retrieve file response
+	error = getResponseFromServer(socket1, FILE_STATUS_OK, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Failed to Retrieve File from Server, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);	
+
+	//Open file and save
+	char * file = basename(path);
+	int fd;
+	
+	if((fd = open(file, O_WRONLY | O_CREAT, USR_GRP)) < 0)
+	{
+		printerror(13);
+		return 13;
+	}
+	
+	//Reading file from server
+	error = readFile(socket2, fd);
+	if(error != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	
+	//closing second socket and 
+	if(close(fd) != 0)
+	{
+		printerror(16);
+		return 16;
+	}
+	
+	if(close(socket2) != 0)
+	{
+		printerror(17);
+		return 17;
+	}
+	
+	//Reads response from server if file was sent successfully
+	error = getResponseFromServer(socket1, FILE_SEND_OK, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Server failed to send file, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);	
+	
+	//End the connection with the server
+	if((error = sendCommand(socket1, "quit\n")) != 0)
+	{
+		printerror(error);
+		return error;
+	}
+	//Check quit response from server
+	error = getResponseFromServer(socket1, GOOD_BYE, res);
+	if(error != 0)
+	{
+		printerror(error);
+		
+		if(error == 9)
+			printf("Failed to Succesfully QUIT from Server, Response code: %s\n", res);
+		
+		return error;
+	}
+	
+	printmsg(res);	
+	
+	if(close(socket1) != 0)
+	{
+		printerror(17);
+		return 17;
+	}	
+	
+	//Proper free
+	freeaddrinfo(host_info);
+	
+	printf("Created File %s in the current Working Directory!\n", file);	
 
 	return 0;
 }
@@ -295,6 +419,42 @@ int sendCommand(int socket, char * cmd)
 	{
 		return 10;
 	}
+	
+	return 0;
+}
+
+int parsePassiveModeParams(const char *res, int *connectionAddress) 
+{
+	if (sscanf(res, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", 
+		&connectionAddress[0], 
+		&connectionAddress[1], 
+		&connectionAddress[2], 
+		&connectionAddress[3], 
+		&connectionAddress[4], 
+		&connectionAddress[5]) < 6) 
+		{
+			return 12;
+		}
+
+	return 0;
+}
+
+int readFile(int socket, int fd)
+{
+	char readBlock[MAX_BUF];
+	ssize_t bytesRead, bytesWritten;
+	
+	while((bytesRead = read(socket, readBlock, MAX_BUF)) > 0)
+	{
+		if((bytesWritten = write(fd, readBlock, bytesRead)) < 0)
+			return  14;
+		else if(bytesWritten != bytesRead)
+			return 14;
+		
+	}
+	
+	if(bytesRead < 0)
+		return 15;
 	
 	return 0;
 }

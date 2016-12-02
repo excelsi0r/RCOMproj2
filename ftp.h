@@ -25,24 +25,35 @@
 
 static const char * error_msg[] =
 {
-	/*0*/"ERROR: Invalid error called",
-	/*1*/"ERROR: Bad Arguments!\nUsage: download <url>",
-	/*2*/"ERROR: Parsing invalid url",
-	/*3*/"ERROR: Failed to retrieve address info",
-	/*4*/"ERROR: Failed to retrieve IPV4 from server",
-	/*5*/"ERROR: Failed to create sockets",
-	/*6*/"ERROR: Failed to connect socket to server",
-	/*7*/"ERROR: Failed to Read from Server",
-	/*8*/"ERROR: Response from server wasn't a valid code",
-	/*9*/"ERROR: Unexpected Response from Server",
+	/*00*/"ERROR: Invalid error called",
+	/*01*/"ERROR: Bad Arguments!\nUsage: download <url>",
+	/*02*/"ERROR: Parsing invalid url",
+	/*03*/"ERROR: Failed to retrieve address info",
+	/*04*/"ERROR: Failed to retrieve IPV4 from server",
+	
+	/*05*/"ERROR: Failed to create sockets",
+	/*06*/"ERROR: Failed to connect socket to server",
+	/*07*/"ERROR: Failed to Read from Server",
+	/*08*/"ERROR: Response from server wasn't a valid code",
+	/*09*/"ERROR: Unexpected Response from Server",
+	
 	/*10*/"ERROR: Failed to Send command to Server",
-	/*11*/"ERROR: Failed to create Command"
+	/*11*/"ERROR: Failed to create Command to send",
+	/*12*/"ERROR: Failed to Parse the new Passive Mode connection address",
+	/*13*/"ERROR: Failed to create File",
+	/*14*/"ERROR: Failed to Write to new File",
+	
+	/*15*/"ERROR: Failed to Read from File from Server",
+	/*16*/"ERROR: Failed to Close the File Created",
+	/*17*/"ERROR: Failed to Close Socket"
 };
 
 int parseURLelems(const char * argument, char * host, char * path, char * user, char * password);
 int replacewithspaces(const char * resturl, char * spliturl);
 int getResponseFromServer(int scoket, int expected, char * res);
 int sendCommand(int socket, char * cmd);
+int parsePassiveModeParams(const char *res, int *connectionAddress);
+int readFile(int socket, int fd);
 int printerror(int num);
 int printmsg(char * msg);
 
